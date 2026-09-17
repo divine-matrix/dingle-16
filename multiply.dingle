@@ -1,0 +1,18 @@
+// Loading Memory
+.fill 0x00FF 0x5
+.fill 0x0100 0x8
+.fill 0x0101 0x1
+
+// Code
+LDI 1 0x0100    // Reg1 = 8 (Multiplier / Counter)
+LDI 3 0x00FF    // Reg3 = 5 (Multiplicand)
+LDI 4 0x0101    // Reg4 = 1 (Constant 1 for decrementing)
+
+// Pre-loop setup
+SUB 0 0 0       // Clear Reg0 (Accumulator = 0)
+
+// Loop start (PC = 5)
+ADD 0 0 3       // Reg0 = Reg0 + Reg3 (Accumulate value)
+SUB 1 1 4       // Decrement counter (Reg1 = Reg1 - Reg4)
+JMN 0x0005      // Jump back to loop start (PC 5) if counter > 0
+HLT

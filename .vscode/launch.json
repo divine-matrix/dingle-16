@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++: Debug Assembler Project",
+            "type": "lldb",
+            "request": "launch",
+            "program": "/Users/blockgenie/Documents/_divinematrix/dingle-16/assembler",
+            "args": [],
+            "cwd": "${fileDirname}",
+            "terminal": "integrated",
+            "preLaunchTask": "C/C++: clang++ build active file"
+        }
+    ]
+}
