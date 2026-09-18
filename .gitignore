@@ -1,3 +1,14 @@
+# Build folder and others
+
+.cache/
+build/
+.vscode/
+assembler.dSYM/
+
+# DS store
+
+.DS_Store
+
 # Prerequisites
 *.d
 

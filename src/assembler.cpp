@@ -112,11 +112,8 @@ int parseToken(const string &tok, uint16_t &outVal) {
   }
 }
 
-int main() {
-  string fileName = "";
-  cout << "Enter filename: ";
-  if (!(cin >> fileName))
-    return 0;
+int assemble(string fName, DebugFlags flags) {
+  string fileName = fName;
 
   ifstream SourceFile(fileName);
   if (!SourceFile.is_open()) {
