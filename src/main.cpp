@@ -142,17 +142,26 @@ public:
   string filePath;
   string fileName;
   int fileStatus; // NOTE: 0 is saved, 1 is not saved, 2 is no path.
+
   File(string path, string contents) {
     fileContents = contents;
     filePath = path;
     fileName = split(path, '/').back();
-  }
-  File() {
-    fileContents = "";
-    fileStatus = 2;
+    fileStatus = 0;
   }
 
-  void save() { saveAtPath(filePath); }
+  File() {
+    fileContents = "";
+    filePath = "";
+    fileName = "Untitled";
+    fileStatus = 2; // NOTE: Set to 2 so Save As path selection triggers
+  }
+
+  void save() {
+    if (!filePath.empty()) {
+      saveAtPath(filePath);
+    }
+  }
 
   void saveAtPath(string path) {
     ofstream saveFile(path);
@@ -160,6 +169,9 @@ public:
       showError(FileSaveError);
     } else {
       saveFile << fileContents << endl;
+      filePath = path;
+      fileName = split(path, '/').back();
+      fileStatus = 0;
     }
     saveFile.close();
   }
@@ -218,17 +230,15 @@ public:
       if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New")) {
           fileList.push_back(File());
+          selectedFile = (int)fileList.size() - 1;
         }
         if (ImGui::MenuItem("Save")) {
-          // NOTE: Guard against saving when no file is loaded to prevent
-          // out-of-bounds access
           if (fileList.empty()) {
             showError(FileNotOpenError);
+          } else if (fileList[selectedFile].fileStatus == 2 ||
+                     fileList[selectedFile].filePath.empty()) {
+            showSaveAsDialog = true;
           } else {
-            if (fileList[selectedFile].fileStatus == 2) {
-              showSaveAsDialog = true;
-            } else {
-            }
             fileList[selectedFile].save();
             status = "Saved " + fileList[selectedFile].fileName + " to disk.";
           }
@@ -237,7 +247,6 @@ public:
       }
       ImGui::EndMenuBar();
     }
-
     if (fileList.size() == 0) {
       ImVec2 box_size = ImVec2(800, 600.0f);
       float padding = 10.0f;
