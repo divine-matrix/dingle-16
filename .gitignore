@@ -3,7 +3,7 @@
 .cache/
 build/
 .vscode/
-assembler.dSYM/
+assembler.dSYM/*
 
 # DS store
 
