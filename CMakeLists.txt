@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(DingleApp CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -11,6 +11,7 @@ add_compile_definitions(GL_SILENCE_DEPRECATION)
 # Find dependencies via vcpkg
 find_package(imgui CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
+find_package(tinyfiledialogs CONFIG REQUIRED) # ---> ADD THIS
 
 # Include all your C++ source files so symbols like runProgram are found
 add_executable(my_app
@@ -20,10 +21,16 @@ add_executable(my_app
     src/FuzzyMatcher.cpp
 )
 
-# Link ImGui, GLFW, and your local FuzzyMatcher library
+# Link ImGui, GLFW, tinyfiledialogs, and your local FuzzyMatcher library
 target_link_libraries(my_app PRIVATE
     imgui::imgui
     glfw
+    tinyfiledialogs::tinyfiledialogs # ---> ADD THIS
+)
+
+# PATCH FOR IMGUI_STDLIB
+target_include_directories(my_app PRIVATE
+    ${imgui_INCLUDE_DIRS}/imgui
 )
 
 # Explicitly link Native macOS OpenGL Frameworks
