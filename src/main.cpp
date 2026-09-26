@@ -201,6 +201,13 @@ public:
     // coexist
     std::string panelTitle =
         "File Viewer###FileViewerPanel_" + std::to_string(viewerIndex);
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar;
+
+    if (showSaveAsDialog) {
+      flags |= ImGuiWindowFlags_NoInputs;
+    }
+
     ImGui::Begin(panelTitle.c_str(), nullptr, ImGuiWindowFlags_MenuBar);
 
     if (ImGui::IsWindowFocused() && fileList.size() != 0) {
@@ -219,7 +226,7 @@ public:
             showError(FileNotOpenError);
           } else {
             if (fileList[selectedFile].fileStatus == 2) {
-
+              showSaveAsDialog = true;
             } else {
             }
             fileList[selectedFile].save();
@@ -304,6 +311,9 @@ static string openRecentRecentFiles[10] = {
     "fibonacci.dingle", "poo.dingle",       "fibonacci.dingle", "poo.dingle",
     "fibonacci.dingle", "poop.dingle"};
 
+// Varaiables for File -> Save As
+static string saveAsPath;
+
 void addFileToRecentList(const string &filePath) {
   if (filePath.empty())
     return;
@@ -362,6 +372,36 @@ void drawCommandBar() {
     }
     ImGui::End();
   }
+}
+
+void drawSaveAsDialog(File &currentFile) {
+  ImGui::Begin("Save as", &showSaveAsDialog, ImGuiWindowFlags_NoCollapse);
+
+  ImGui::Text(saveAsPath.c_str());
+  if (ImGui::Button("Browse...")) {
+    const char *filterPatterns[] = {"*"};
+    const char *selectedPath =
+        tinyfd_openFileDialog("Browse",       // Title
+                              ".",            // Default path
+                              1,              // Number of filter patterns
+                              filterPatterns, // Filter array
+                              "All Files",    // Description
+                              0               // Allow multiple (0 = false)
+        );
+
+    saveAsPath = selectedPath;
+  }
+  if (ImGui::Button("Save as")) {
+    if (saveAsPath.empty()) {
+      showError(UnsupportedFeature);
+    } else {
+      currentFile.saveAtPath(saveAsPath);
+      currentFile.fileStatus = 0;
+      saveAsPath = "";
+    }
+  }
+
+  ImGui::End();
 }
 
 bool fuzzyMatch(const string &query, const string &target) {
