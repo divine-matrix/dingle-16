@@ -1,22 +1,34 @@
-
-#include "assembler.h"
-#include "imgui.h"
-#include "imgui_impl_glfw.h"    // Adjusted path notation for vcpkg
-#include "imgui_impl_opengl3.h" // Adjusted path notation for vcpkg
-#include "imgui_stdlib.h"
-#include "tinyfiledialogs.h" // Make sure this file is placed in src/
-#include <GLFW/glfw3.h>
+// NOTE: Standard C++ library headers MUST come first
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cfloat>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <sstream>
+#include <string>
+#include <vector>
+
+// NOTE: C and OS headers
 #include <stdio.h>
 #include <string.h>
-#include <string>
 #include <unistd.h>
-#include <vector>
+
+// NOTE: Project and ImGui headers
+#include "assembler.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+#include "imgui_stdlib.h"
+#include "tinyfiledialogs.h"
+#include <GLFW/glfw3.h>
+
+// NOTE: Memory editor included after standard types are fully loaded
+// #include "imgui_memory_editor.h"
 
 using namespace std;
 
@@ -24,7 +36,7 @@ string gstatus = "idle";
 int currentId = 0;
 ImVec2 nextWindowPosition = ImVec2(10, 10);
 
-static bool showSaveAsDialog;
+static bool showSaveAsDialog = false;
 
 vector<string> split(const string &input, char delimiter) {
   vector<string> result;
@@ -59,24 +71,29 @@ ErrorData getErrorData(Error error) {
     data.name = "File Open Error";
     data.debugInfo = "An error occured while opening a file.";
     data.code = 100;
+    break;
   case FileSaveError:
     data.name = "File Save Error";
     data.debugInfo = "An error occured while saving a file to the disk.";
     data.code = 101;
+    break;
   case UnknownCommand:
     data.name = "Unknown Command Error";
     data.debugInfo =
         "Malformed or unknown command was entered into the Command Console.";
     data.code = 200;
+    break;
   case UnsupportedFeature:
     data.name = "Unsupported Feature";
     data.debugInfo = "That feature has not been added yet, keep a lookout for "
                      "future updates on the YouTube channel or the Github.";
     data.code = 201;
+    break;
   case FileNotOpenError:
     data.name = "File Not Open Error";
     data.debugInfo = "Open a file to use this function";
     data.code = 110;
+    break;
   }
   return data;
 }
@@ -84,7 +101,7 @@ ErrorData getErrorData(Error error) {
 class ErrorWindow {
 public:
   Error currentError;
-  int windowID = 0; // Assigned dynamically upon creation
+  int windowID = 0;
   bool is_open = true;
   ImVec2 position;
 
@@ -108,8 +125,6 @@ public:
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking |
         ImGuiWindowFlags_NoMove;
 
-    // NOTE: Appending ### ensures a unique hash ID for the window layout state
-    // while presenting a clean, user-friendly visible window title string.
     std::string windowTitle = "Error: " + getErrorData(currentError).name +
                               "###ErrorWin_" + std::to_string(windowID);
     ImGui::Begin(windowTitle.c_str(), nullptr, flags);
@@ -131,30 +146,31 @@ vector<ErrorWindow> errorWindows;
 
 void showError(Error err) {
   ErrorWindow newWindow(err);
-  newWindow.windowID =
-      currentId++; //  NOTE: Explicit unique ID tracking assigned instantly
+  newWindow.windowID = currentId++;
   errorWindows.push_back(newWindow);
 }
 
-class File {
+// NOTE: Renamed from File to AppFile to prevent namespace shadowing with system
+// headers
+class AppFile {
 public:
   string fileContents;
   string filePath;
   string fileName;
   int fileStatus; // NOTE: 0 is saved, 1 is not saved, 2 is no path.
 
-  File(string path, string contents) {
+  AppFile(string path, string contents) {
     fileContents = contents;
     filePath = path;
     fileName = split(path, '/').back();
     fileStatus = 0;
   }
 
-  File() {
+  AppFile() {
     fileContents = "";
     filePath = "";
     fileName = "Untitled";
-    fileStatus = 2; // NOTE: Set to 2 so Save As path selection triggers
+    fileStatus = 2;
   }
 
   void save() {
@@ -168,7 +184,7 @@ public:
     if (!saveFile.is_open()) {
       showError(FileSaveError);
     } else {
-      saveFile << fileContents << endl;
+      saveFile << fileContents;
       filePath = path;
       fileName = split(path, '/').back();
       fileStatus = 0;
@@ -182,8 +198,9 @@ private:
   string status;
 
 public:
-  vector<File> fileList = {};
+  vector<AppFile> fileList = {};
   int selectedFile = 0;
+  bool requestSelect = false;
 
   FileViewer() {}
 
@@ -199,18 +216,15 @@ public:
       string content((std::istreambuf_iterator<char>(targetFile)),
                      std::istreambuf_iterator<char>());
 
-      selectedFile = fileList.size();
-      fileList.push_back(File(filePath, content));
+      selectedFile = (int)fileList.size();
+      requestSelect = true;
+      fileList.push_back(AppFile(filePath, content));
     }
   }
 
-  // NOTE: Added viewerIndex parameters to prevent cross-window ID pollution
   void draw(int viewerIndex) {
-    ImGui::PushID(viewerIndex); // NOTE: Scopes everything rendered inside this
-                                // window instance
+    ImGui::PushID(viewerIndex);
 
-    // NOTE: Prevent window stack collisions if multiple File Viewer panels
-    // coexist
     std::string panelTitle =
         "File Viewer###FileViewerPanel_" + std::to_string(viewerIndex);
 
@@ -220,17 +234,18 @@ public:
       flags |= ImGuiWindowFlags_NoInputs;
     }
 
-    ImGui::Begin(panelTitle.c_str(), nullptr, ImGuiWindowFlags_MenuBar);
+    ImGui::Begin(panelTitle.c_str(), nullptr, flags);
 
-    if (ImGui::IsWindowFocused() && fileList.size() != 0) {
+    if (ImGui::IsWindowFocused() && !fileList.empty()) {
       status = "editing";
     }
 
     if (ImGui::BeginMenuBar()) {
       if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New")) {
-          fileList.push_back(File());
+          fileList.push_back(AppFile());
           selectedFile = (int)fileList.size() - 1;
+          requestSelect = true;
         }
         if (ImGui::MenuItem("Save")) {
           if (fileList.empty()) {
@@ -247,7 +262,8 @@ public:
       }
       ImGui::EndMenuBar();
     }
-    if (fileList.size() == 0) {
+
+    if (fileList.empty()) {
       ImVec2 box_size = ImVec2(800, 600.0f);
       float padding = 10.0f;
 
@@ -272,141 +288,119 @@ public:
       ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
       ImGui::GetWindowDrawList()->AddText(text_pos, text_color, text);
     } else {
-      // NOTE: Tab bars must have localized unique scopes to preserve click
-      // states
-
       std::string tabbarId = "FileViewerTabBar_" + std::to_string(viewerIndex);
       if (ImGui::BeginTabBar(tabbarId.c_str())) {
         for (size_t i = 0; i < fileList.size(); i++) {
-          ImGui::PushID(
-              (int)i); // NOTE: Protects iterative button clicks within tabs
-          if (ImGui::TabItemButton(fileList[i].fileName.c_str())) {
+          ImGui::PushID((int)i);
+          ImGuiTabItemFlags tabFlags = ImGuiTabItemFlags_None;
+          if (requestSelect && (int)i == selectedFile)
+            tabFlags |= ImGuiTabItemFlags_SetSelected;
+          if (fileList[i].fileStatus == 1)
+            tabFlags |= ImGuiTabItemFlags_UnsavedDocument;
+
+          if (ImGui::BeginTabItem(fileList[i].fileName.c_str(), nullptr,
+                                  tabFlags)) {
             selectedFile = (int)i;
+            if (ImGui::InputTextMultiline("##fileEditor",
+                                          &fileList[i].fileContents,
+                                          ImVec2(-FLT_MIN, -FLT_MIN))) {
+              if (fileList[i].fileStatus == 0)
+                fileList[i].fileStatus = 1;
+            }
+            ImGui::EndTabItem();
           }
           ImGui::PopID();
         }
-
-        // NOTE: Replaced uniform label string with dynamic variant targeting
-        // active index state
-        std::string activeEditorId =
-            "##fileEditor_" + std::to_string(selectedFile);
-        ImGui::InputTextMultiline(activeEditorId.c_str(),
-                                  &fileList[selectedFile].fileContents,
-                                  ImVec2(-FLT_MIN, -FLT_MIN));
+        requestSelect = false;
+        ImGui::EndTabBar(); // only call when BeginTabBar returned true
       }
-      ImGui::EndTabBar();
     }
-    ImGui::Text(status.c_str());
+    ImGui::Text("%s", status.c_str());
     ImGui::End();
-    ImGui::PopID(); // NOTE: Safely closes pushed viewerIndex scope
+    ImGui::PopID();
   }
 };
 
-// Variables for File Viewer
-bool showUseFileLoadToLoadFileText = false;
-vector<FileViewer> fileViewersCurrentOpen = {FileViewer()};
-static bool showFileViewer = true;
+// ---- Globals that main() relies on (were missing) ----
+vector<FileViewer> fileViewersCurrentOpen(1);
+bool showFileViewer = true;
+bool showOpenRecentWindow = false;
+bool showCommandConsole = false;
+string openRecentSearchBarBuffer = "Search here";
+array<string, 10> openRecentRecentFiles;
+int openRecentSelectedFile = -1;
 
-// Variables for command console
-static bool showCommandConsole = false;
-
-// Variables for File -> Open Recent
-static bool showOpenRecentWindow = false;
-static std::string openRecentSearchBarBuffer =
-    "Search here"; // Converted to string for stdlib support
-static int openRecentSelectedFile = -1;
-static string openRecentRecentFiles[10] = {
-    "poo.dingle",       "fibonacci.dingle", "mario.dingle",     "poo.dingle",
-    "fibonacci.dingle", "poo.dingle",       "fibonacci.dingle", "poo.dingle",
-    "fibonacci.dingle", "poop.dingle"};
-
-// Varaiables for File -> Save As
-static string saveAsPath;
-
-void addFileToRecentList(const string &filePath) {
-  if (filePath.empty())
+void addFileToRecentList(const string &path) {
+  if (path.empty())
     return;
-
-  for (int i = 0; i < 10; i++) {
-    if (openRecentRecentFiles[i] == filePath) {
-      for (int j = i; j > 0; j--) {
-        openRecentRecentFiles[j] = openRecentRecentFiles[j - 1];
-      }
-      openRecentRecentFiles[0] = filePath;
-      return;
+  // Remove existing occurrence, then push to the front
+  size_t last = openRecentRecentFiles.size() - 1;
+  for (size_t i = 0; i < openRecentRecentFiles.size(); i++) {
+    if (openRecentRecentFiles[i] == path) {
+      last = i;
+      break;
     }
   }
-
-  for (int i = 9; i > 0; i--) {
+  for (size_t i = last; i > 0; i--)
     openRecentRecentFiles[i] = openRecentRecentFiles[i - 1];
-  }
-  openRecentRecentFiles[0] = filePath;
+  openRecentRecentFiles[0] = path;
 }
+
+static string commandBuffer;
+static vector<string> commandLog;
 
 void drawCommandBar() {
-  if (showCommandConsole) {
-    ImGui::Begin("Command Console", &showCommandConsole);
-    ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
-    static char inputBuffer[128] = ""; // Fixed array instantiation bug
-
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
-        !ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0)) {
-      ImGui::SetKeyboardFocusHere();
-    }
-
-    ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputText("##ConsoleInput", inputBuffer, sizeof(inputBuffer),
-                         flags)) {
-      std::string fullInput(inputBuffer);
-      if (!fullInput.empty()) {
-        std::stringstream ss(fullInput);
-        std::string command;
-        std::string argument;
-
-        ss >> command;
-        std::getline(ss >> std::ws, argument);
-
-        if (command == "error") {
-          if (!argument.empty()) {
-            showError(static_cast<Error>(
-                std::stoi(argument))); // FIX: Use centralized wrapper
-          } else {
-            showError(UnknownCommand);
-          }
-        } else {
-          std::cout << "Unknown command: " << command << std::endl;
-        }
-        inputBuffer[0] = '\0';
+  ImGui::Begin("Command Console", &showCommandConsole);
+  for (const string &line : commandLog)
+    ImGui::TextUnformatted(line.c_str());
+  ImGui::Separator();
+  if (ImGui::InputText("##cmd", &commandBuffer,
+                       ImGuiInputTextFlags_EnterReturnsTrue)) {
+    vector<string> parts = split(commandBuffer, ' ');
+    if (!parts.empty()) {
+      commandLog.push_back("> " + commandBuffer);
+      if (parts[0] == "help") {
+        commandLog.push_back("Commands: help, status, clear");
+      } else if (parts[0] == "status") {
+        commandLog.push_back("Status: " + gstatus);
+      } else if (parts[0] == "clear") {
+        commandLog.clear();
+      } else {
+        showError(UnknownCommand);
       }
     }
-    ImGui::End();
+    commandBuffer.clear();
+    ImGui::SetKeyboardFocusHere(-1);
   }
+  ImGui::End();
 }
 
-void drawSaveAsDialog(File &currentFile) {
+static string saveAsPath;
+
+void drawSaveAsDialog(AppFile &currentFile) {
+  if (!showSaveAsDialog)
+    return;
+
   ImGui::Begin("Save as", &showSaveAsDialog, ImGuiWindowFlags_NoCollapse);
 
-  ImGui::Text(saveAsPath.c_str());
+  ImGui::Text("%s", saveAsPath.c_str());
   if (ImGui::Button("Browse...")) {
-    const char *filterPatterns[] = {"*"};
-    const char *selectedPath =
-        tinyfd_openFileDialog("Browse",       // Title
-                              ".",            // Default path
-                              1,              // Number of filter patterns
-                              filterPatterns, // Filter array
-                              "All Files",    // Description
-                              0               // Allow multiple (0 = false)
-        );
+    const char *filterPatterns[] = {"*.dingle", "*.txt", "*"};
+    const char *selectedPath = tinyfd_saveFileDialog(
+        "Save As", "untitled.dingle", 3, filterPatterns, "Dingle Files");
 
-    saveAsPath = selectedPath;
+    if (selectedPath != nullptr) {
+      saveAsPath = selectedPath;
+    }
   }
-  if (ImGui::Button("Save as")) {
+
+  if (ImGui::Button("Save")) {
     if (saveAsPath.empty()) {
-      showError(UnsupportedFeature);
+      showError(FileSaveError);
     } else {
       currentFile.saveAtPath(saveAsPath);
-      currentFile.fileStatus = 0;
       saveAsPath = "";
+      showSaveAsDialog = false;
     }
   }
 
@@ -450,25 +444,33 @@ int main() {
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
+  ImGui::StyleColorsDark();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init("#version 150");
+
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
 
-    ImGuiIO &io = ImGui::GetIO();
-    int w = 1280, h = 720;
-    glfwGetFramebufferSize(window, &w, &h);
-    io.DisplaySize = ImVec2((float)w, (float)h);
     ImGui::NewFrame();
 
-    std::erase_if(errorWindows,
-                  [](const ErrorWindow &window) { return !window.is_open; });
+    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(),
+                                 ImGuiDockNodeFlags_PassthruCentralNode);
+    errorWindows.erase(
+        std::remove_if(errorWindows.begin(), errorWindows.end(),
+                       [](const ErrorWindow &w) { return !w.is_open; }),
+        errorWindows.end());
 
     if (ImGui::BeginMainMenuBar()) {
       if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New")) {
+          fileViewersCurrentOpen[0].fileList.push_back(AppFile());
+          fileViewersCurrentOpen[0].selectedFile =
+              (int)fileViewersCurrentOpen[0].fileList.size() - 1;
+          fileViewersCurrentOpen[0].requestSelect = true;
         }
         if (ImGui::MenuItem("Open...")) {
 
@@ -493,7 +495,8 @@ int main() {
           showOpenRecentWindow = true;
         }
         ImGui::EndMenu();
-      } else if (ImGui::BeginMenu("Debug")) {
+      }
+      if (ImGui::BeginMenu("Debug")) {
         if (ImGui::MenuItem("Command Console")) {
           showCommandConsole = !showCommandConsole;
         }
@@ -566,10 +569,17 @@ int main() {
       }
       ImGui::End();
     }
+
     if (showFileViewer) {
       for (size_t i = 0; i < fileViewersCurrentOpen.size(); i++) {
-        fileViewersCurrentOpen[i].draw(
-            (int)i); // FIX: Passing loop index parameter here
+        fileViewersCurrentOpen[i].draw((int)i);
+      }
+
+      // NOTE: Call Save As dialog if active and a file exists
+      if (showSaveAsDialog && !fileViewersCurrentOpen.empty() &&
+          !fileViewersCurrentOpen[0].fileList.empty()) {
+        int activeIdx = fileViewersCurrentOpen[0].selectedFile;
+        drawSaveAsDialog(fileViewersCurrentOpen[0].fileList[activeIdx]);
       }
     }
     if (showCommandConsole) {

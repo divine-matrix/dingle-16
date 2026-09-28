@@ -16,3 +16,5 @@ ADD 0 0 3       // Reg0 = Reg0 + Reg3 (Accumulate value)
 SUB 1 1 4       // Decrement counter (Reg1 = Reg1 - Reg4)
 JMN 0x0005      // Jump back to loop start (PC 5) if counter > 0
 HLT
+
+// poop shit

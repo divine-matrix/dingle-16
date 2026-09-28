@@ -5,6 +5,10 @@ build/
 .vscode/
 assembler.dSYM/*
 
+# dingle assembly files
+
+*.dingle
+
 # DS store
 
 .DS_Store
